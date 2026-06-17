@@ -32,3 +32,5 @@ backups/
 
 # prisma
 prisma/migrations/dev.db*
+
+.vercel

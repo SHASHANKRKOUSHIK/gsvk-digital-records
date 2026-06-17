@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
     const { type, className, year, filters } = await req.json()
 
-    let where: Record<string, unknown> = { isActive: true }
+    const where: Record<string, unknown> = { isActive: true }
     if (filters?.className) where.className = filters.className
     if (filters?.year) where.academicYear = filters.year
 
@@ -53,7 +53,13 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return new NextResponse(buffer, {
+    // NextResponse's BodyInit type doesn't accept a raw Node Buffer under
+    // strict TypeScript checking (even though it works fine at runtime).
+    // Wrapping it as a Uint8Array satisfies the type and is a zero-copy view
+    // over the same underlying memory, so there's no performance cost.
+    const body = new Uint8Array(buffer)
+
+    return new NextResponse(body, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,
