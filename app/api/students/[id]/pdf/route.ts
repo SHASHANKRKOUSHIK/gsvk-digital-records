@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
-import { bloodGroupLabel, formatDate, getProfileUrl } from '@/lib/utils'
+import { bloodGroupLabel, formatDate, getProfileUrl, bufferToArrayBuffer } from '@/lib/utils'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -146,8 +146,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     const pdfBytes = await pdfDoc.save()
+    const pdfBuffer = Buffer.from(pdfBytes)
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(bufferToArrayBuffer(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${student.studentName.replace(/\s/g, '_')}_${student.admissionNumber}.pdf"`,

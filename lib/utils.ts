@@ -48,3 +48,18 @@ export function classLabel(c: string): string {
   if (c === 'Nursery' || c === 'LKG' || c === 'UKG') return c
   return `Class ${c}`
 }
+
+/**
+ * Converts a Node Buffer into a plain ArrayBuffer for use as a Response/
+ * NextResponse body. Buffer and Uint8Array (even manually wrapped) fail to
+ * type-check as BodyInit under recent TypeScript + @types/node versions,
+ * because their ArrayBufferLike generic parameter includes
+ * SharedArrayBuffer, which BodyInit's stricter ArrayBuffer type rejects.
+ * Copying into a fresh ArrayBuffer sidesteps this with no behavioral or
+ * performance difference for files of this size.
+ */
+export function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
+  const arrayBuffer = new ArrayBuffer(buf.byteLength)
+  new Uint8Array(arrayBuffer).set(buf)
+  return arrayBuffer
+}

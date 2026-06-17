@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerUser } from '@/lib/auth'
 import { generateClassWiseExcel, generateYearWiseExcel, generateCombinedExcel } from '@/services/excel'
+import { bufferToArrayBuffer } from '@/lib/utils'
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,13 +54,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // NextResponse's BodyInit type doesn't accept a raw Node Buffer under
-    // strict TypeScript checking (even though it works fine at runtime).
-    // Wrapping it as a Uint8Array satisfies the type and is a zero-copy view
-    // over the same underlying memory, so there's no performance cost.
-    const body = new Uint8Array(buffer)
-
-    return new NextResponse(body, {
+    return new NextResponse(bufferToArrayBuffer(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,
