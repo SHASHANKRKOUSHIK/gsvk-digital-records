@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  DATA_ENTRY_OPERATOR
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum BloodGroup {
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+  O_POS
+  O_NEG
+  UNKNOWN
+}
+
+enum OcrStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVIEW
+}
+
+enum DocumentType {
+  ADMISSION_FORM
+  BIRTH_CERTIFICATE
+  TRANSFER_CERTIFICATE
+  MARK_SHEET
+  PHOTO
+  AADHAR
+  OTHER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(DATA_ENTRY_OPERATOR)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+  ocrJobs   OcrJob[]
+  exports   Export[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Student {
+  id              String     @id @default(cuid())
+  admissionNumber String     @unique
+  admissionDate   DateTime
+  studentName     String
+  gender          Gender
+  dateOfBirth     DateTime
+  bloodGroup      BloodGroup @default(UNKNOWN)
+  aadharNumber    String?    @unique
+  className       String
+  section         String?
+  academicYear    String
+  religion        String?
+  caste           String?
+  previousSchool  String?
+  tcNumber        String?
+  remarks         String?
+  photoUrl        String?
+  qrCode          String?
+  isActive        Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  parents   Parent[]
+  documents Document[]
+  auditLogs AuditLog[]
+  ocrJobs   OcrJob[]
+
+  @@index([studentName])
+  @@index([admissionNumber])
+  @@index([className])
+  @@index([academicYear])
+  @@index([aadharNumber])
+  @@map("students")
+}
+
+model Parent {
+  id             String   @id @default(cuid())
+  studentId      String
+  fatherName     String?
+  motherName     String?
+  guardianName   String?
+  phone          String?
+  alternatePhone String?
+  email          String?
+  address        String?
+  city           String?
+  district       String?
+  state          String?
+  pincode        String?
+  occupation     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([fatherName])
+  @@index([motherName])
+  @@index([phone])
+  @@map("parents")
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  studentId     String
+  documentType  DocumentType @default(ADMISSION_FORM)
+  originalName  String
+  storagePath   String
+  processedPath String?
+  ocrText       String?
+  fileSize      Int?
+  mimeType      String?
+  uploadedAt    DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  student Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  ocrJob  OcrJob?
+
+  @@index([studentId])
+  @@map("documents")
+}
+
+model OcrJob {
+  id            String    @id @default(cuid())
+  documentId    String?   @unique
+  studentId     String?
+  userId        String
+  status        OcrStatus @default(PENDING)
+  fileName      String
+  storagePath   String
+  rawText       String?
+  extractedData Json?
+  errorMessage  String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  document Document? @relation(fields: [documentId], references: [id])
+  student  Student?  @relation(fields: [studentId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+
+  @@index([status])
+  @@index([userId])
+  @@index([studentId])
+  @@map("ocr_jobs")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  studentId String?
+  action    String
+  entity    String
+  entityId  String
+  oldData   Json?
+  newData   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  student Student? @relation(fields: [studentId], references: [id])
+
+  @@index([userId])
+  @@index([studentId])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Export {
+  id          String   @id @default(cuid())
+  userId      String
+  exportType  String
+  fileName    String
+  storagePath String
+  filters     Json?
+  rowCount    Int?
+  fileSize    Int?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("exports")
+}
+
+model Backup {
+  id          String   @id @default(cuid())
+  backupType  String
+  storagePath String
+  fileSize    Int?
+  status      String   @default("COMPLETED")
+  createdAt   DateTime @default(now())
+
+  @@map("backups")
+}

@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gsvk_postgres
+    environment:
+      POSTGRES_DB: gsvk_db
+      POSTGRES_USER: gsvk_user
+      POSTGRES_PASSWORD: gsvk_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gsvk_user -d gsvk_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gsvk_app
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://gsvk_user:gsvk_password@postgres:5432/gsvk_db
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-gsvk-documents}
+      GOOGLE_VISION_API_KEY: ${GOOGLE_VISION_API_KEY}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backups:/app/backups
+
+  backup:
+    image: node:20-alpine
+    container_name: gsvk_backup
+    working_dir: /app
+    command: sh -c "while true; do sleep 86400 && node scripts/backup.js; done"
+    environment:
+      DATABASE_URL: postgresql://gsvk_user:gsvk_password@postgres:5432/gsvk_db
+      BACKUP_STORAGE_PATH: /app/backups
+    volumes:
+      - .:/app
+      - ./backups:/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
