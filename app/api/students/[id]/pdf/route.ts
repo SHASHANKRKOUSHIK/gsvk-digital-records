@@ -59,14 +59,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 1, color: rgb(0.9, 0.9, 0.9) })
     y -= 25
 
-    function section(title: string) {
+    // Declared as const arrow functions (not `function` declarations) because
+    // TypeScript disallows plain function declarations directly inside blocks
+    // (e.g. inside this try block) when targeting strict-mode ES5 output.
+    // next dev's transform doesn't enforce this, but Vercel's production
+    // build does, so arrow function expressions are used here instead.
+    const section = (title: string) => {
       page.drawText(title, { x: 40, y, size: 9, font: boldFont, color: blue })
       y -= 14
       page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 0.5, color: rgb(0.85, 0.9, 1) })
       y -= 12
     }
 
-    function row(label: string, value: string, col = 0) {
+    const row = (label: string, value: string, col = 0) => {
       const xLabel = col === 0 ? 40 : width / 2 + 10
       const xValue = col === 0 ? 140 : width / 2 + 110
       page.drawText(label, { x: xLabel, y, size: 9, font: regularFont, color: gray })
