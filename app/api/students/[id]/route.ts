@@ -68,7 +68,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         action: 'UPDATE',
         entity: 'Student',
         entityId: id,
-        oldData: old as Record<string, unknown>,
+        // JSON.parse(JSON.stringify(...)) produces a genuinely plain,
+        // JSON-safe object that satisfies Prisma's recursive InputJsonValue
+        // type. A direct `as Record<string, unknown>` cast doesn't work here
+        // because Prisma's Student model includes Date fields, which aren't
+        // structurally valid JSON values - this round-trip also correctly
+        // converts those Dates to ISO strings for storage.
+        oldData: old ? JSON.parse(JSON.stringify(old)) : null,
         newData: body,
       },
     })
@@ -96,3 +102,4 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
+
