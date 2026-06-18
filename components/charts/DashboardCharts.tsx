@@ -46,18 +46,18 @@ export default function DashboardCharts({ byYear, byClass }: Props) {
       {/* Students per class */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <h2 className="font-semibold text-gray-800 mb-4 text-sm">Students By Class</h2>
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-              <Pie
-                data={classData}
-                dataKey="count"
-                nameKey="name"
-                cx="50%"
-                cy="45%"
-                outerRadius={70}
-                label={false}
-                labelLine={false}
-              >
+        <ResponsiveContainer width="100%" height={280}>
+          <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+            <Pie
+              data={classData}
+              dataKey="count"
+              nameKey="name"
+              cx="50%"
+              cy="45%"
+              outerRadius={70}
+              label={false}
+              labelLine={false}
+            >
               {classData.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
@@ -66,10 +66,22 @@ export default function DashboardCharts({ byYear, byClass }: Props) {
               contentStyle={{ borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12 }}
               formatter={(v: number) => [v, 'Students']}
             />
+            {/*
+              recharts' shipped Formatter type defines `entry.payload` as
+              `{ strokeDasharray, value }` (an internal SVG-styling shape),
+              not our actual pie-slice data - casting it directly fails to
+              type-check and isn't reliable at runtime either. Instead, look
+              up the count from `classData` (which we already have in scope)
+              using `value`, which holds the slice's `name` and is properly
+              typed as `any`.
+            */}
             <Legend
               iconSize={10}
               wrapperStyle={{ fontSize: 11, paddingTop: 12 }}
-              formatter={(value, entry) => `${value}: ${(entry.payload as { count: number }).count}`}
+              formatter={(value) => {
+                const match = classData.find(d => d.name === value)
+                return `${value}: ${match?.count ?? 0}`
+              }}
             />
           </PieChart>
         </ResponsiveContainer>
