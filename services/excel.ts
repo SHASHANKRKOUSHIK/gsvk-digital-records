@@ -2,7 +2,10 @@ import ExcelJS from 'exceljs'
 import { getProfileUrl } from '@/lib/utils'
 import type { Student } from '@/types'
 
-interface ExportStudent extends Student {
+// `Omit<Student, 'parents'>` removes the inherited `parents` field before
+// redeclaring it with this service's narrower shape - see search/page.tsx
+// for the full explanation of why this is necessary.
+interface ExportStudent extends Omit<Student, 'parents'> {
   parents?: Array<{
     fatherName?: string
     motherName?: string

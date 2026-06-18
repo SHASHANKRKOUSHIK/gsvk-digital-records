@@ -7,8 +7,13 @@ import { formatDate, bloodGroupLabel } from '@/lib/utils'
 import { CLASSES, ACADEMIC_YEARS } from '@/types'
 import type { Student } from '@/types'
 
-interface SearchResult extends Student {
-  parents: Array<{ fatherName?: string; motherName?: string; phone?: string; city?: string }>
+// `Omit<Student, 'parents'>` removes the inherited `parents` field (typed as
+// full `Parent[]` objects requiring `id`/`studentId`) before redeclaring it
+// with this page's narrower shape - TypeScript's `extends` doesn't allow
+// directly narrowing an inherited property to an incompatible type, so the
+// conflicting field must be omitted first.
+interface SearchResult extends Omit<Student, 'parents'> {
+  parents?: Array<{ fatherName?: string; motherName?: string; phone?: string; city?: string }>
 }
 
 export default function SearchPage() {

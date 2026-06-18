@@ -5,7 +5,10 @@ import { formatDate } from '@/lib/utils'
 import { ExternalLink, Edit, FileText } from 'lucide-react'
 import type { Student } from '@/types'
 
-interface StudentRow extends Student {
+// `Omit<Student, 'parents'>` removes the inherited `parents` field before
+// redeclaring it with this component's narrower shape - see search/page.tsx
+// for the full explanation of why this is necessary.
+interface StudentRow extends Omit<Student, 'parents'> {
   parents?: Array<{ fatherName?: string; motherName?: string; phone?: string }>
 }
 
