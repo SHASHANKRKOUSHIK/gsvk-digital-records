@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, ScanLine, CheckCircle, Loader2, FileImage, AlertCircle, Edit } from 'lucide-react'
+import { Upload, ScanLine, CheckCircle, Loader2, FileImage, AlertCircle, Edit, Info } from 'lucide-react'
+import Link from 'next/link'
 import StudentForm from '@/components/forms/StudentForm'
 import type { StudentFormData } from '@/types'
 
@@ -15,6 +16,7 @@ export default function OcrPage() {
   const [extractedData, setExtractedData] = useState<Partial<StudentFormData>>({})
   const [rawText, setRawText] = useState('')
   const [error, setError] = useState('')
+  const [ocrUnavailable, setOcrUnavailable] = useState(false)
   const [jobId, setJobId] = useState('')
   const [showRaw, setShowRaw] = useState(false)
 
@@ -23,6 +25,7 @@ export default function OcrPage() {
     if (!f) return
     setFile(f)
     setError('')
+    setOcrUnavailable(false)
     if (f.type.startsWith('image/')) {
       setPreview(URL.createObjectURL(f))
     }
@@ -46,7 +49,10 @@ export default function OcrPage() {
     try {
       const res = await fetch('/api/ocr', { method: 'POST', body: fd })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'OCR failed')
+      if (!res.ok) {
+        if (data.ocrUnavailable) setOcrUnavailable(true)
+        throw new Error(data.error || 'OCR failed')
+      }
       setExtractedData(data.extractedData || {})
       setRawText(data.rawText || '')
       setJobId(data.jobId || '')
@@ -64,6 +70,7 @@ export default function OcrPage() {
     setExtractedData({})
     setRawText('')
     setError('')
+    setOcrUnavailable(false)
     setJobId('')
   }
 
@@ -93,7 +100,26 @@ export default function OcrPage() {
         ))}
       </div>
 
-      {error && (
+      {error && ocrUnavailable && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-blue-800 font-medium text-sm">OCR isn't available on the live site</p>
+            <p className="text-blue-700 text-sm mt-1">
+              OCR extraction only works when this app is running on your own computer, not on the deployed website.
+              You can still add this student's details directly.
+            </p>
+            <Link
+              href="/dashboard/students/new"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-blue-700 hover:text-blue-900 underline"
+            >
+              Go to manual entry →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {error && !ocrUnavailable && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <p className="text-red-700 text-sm">{error}</p>

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, CheckCircle, XCircle, Loader2, FileImage, ScanLine, Eye } from 'lucide-react'
+import { Upload, CheckCircle, XCircle, Loader2, FileImage, ScanLine, Eye, Info } from 'lucide-react'
 import Link from 'next/link'
 import type { StudentFormData } from '@/types'
 
@@ -20,6 +20,7 @@ export default function BulkOcrPage() {
   const [processing, setProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [done, setDone] = useState(false)
+  const [ocrUnavailable, setOcrUnavailable] = useState(false)
 
   const onDrop = useCallback((accepted: File[]) => {
     setFiles(prev => {
@@ -28,6 +29,7 @@ export default function BulkOcrPage() {
     })
     setDone(false)
     setResults([])
+    setOcrUnavailable(false)
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -46,6 +48,7 @@ export default function BulkOcrPage() {
     setProcessing(true)
     setDone(false)
     setProgress(0)
+    setOcrUnavailable(false)
 
     const initialResults: FileResult[] = files.map(f => ({ fileName: f.name, status: 'pending' }))
     setResults(initialResults)
@@ -65,6 +68,16 @@ export default function BulkOcrPage() {
       try {
         const res = await fetch('/api/ocr/bulk', { method: 'POST', body: fd })
         const data = await res.json()
+
+        // OCR is disabled site-wide (running on Vercel, not locally) - the
+        // backend returns this before processing any files, so stop the
+        // whole batch loop immediately instead of looping through every
+        // remaining batch uselessly.
+        if (data.ocrUnavailable) {
+          setOcrUnavailable(true)
+          setResults(prev => prev.map(r => ({ ...r, status: 'failed', error: data.error })))
+          break
+        }
 
         if (data.results) {
           setResults(prev => prev.map(r => {
@@ -113,13 +126,33 @@ export default function BulkOcrPage() {
         <p className="text-xs text-gray-400 mt-1">JPG, PNG, PDF · Up to 10MB per file · Multiple files supported</p>
       </div>
 
+      {/* OCR unavailable banner */}
+      {ocrUnavailable && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-blue-800 font-medium text-sm">OCR isn't available on the live site</p>
+            <p className="text-blue-700 text-sm mt-1">
+              Bulk OCR extraction only works when this app is running on your own computer, not on the deployed
+              website. You can still add students directly through manual entry.
+            </p>
+            <Link
+              href="/dashboard/students/new"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-blue-700 hover:text-blue-900 underline"
+            >
+              Go to manual entry →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* File list */}
       {files.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <p className="font-medium text-sm text-gray-700">{files.length} file{files.length !== 1 ? 's' : ''} selected</p>
             <div className="flex gap-2">
-              <button onClick={() => { setFiles([]); setResults([]); setDone(false) }}
+              <button onClick={() => { setFiles([]); setResults([]); setDone(false); setOcrUnavailable(false) }}
                 className="text-xs text-gray-500 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-red-50">
                 Clear all
               </button>

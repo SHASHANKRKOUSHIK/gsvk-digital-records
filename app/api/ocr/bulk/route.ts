@@ -4,10 +4,25 @@ import { getServerUser } from '@/lib/auth'
 import { extractTextFromBuffer, parseOcrText } from '@/services/ocr'
 import { uploadFile } from '@/lib/supabase'
 
+// See app/api/ocr/route.ts for full explanation of why this flag exists
+// (Tesseract.js needs filesystem access that Vercel's serverless functions
+// don't provide). Set OCR_DISABLED=1 in Vercel's environment variables.
+const OCR_DISABLED = process.env.OCR_DISABLED === '1'
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getServerUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (OCR_DISABLED) {
+      return NextResponse.json(
+        {
+          error: 'OCR is only available when running this app locally on your own computer, not on the live deployed site.',
+          ocrUnavailable: true,
+        },
+        { status: 501 }
+      )
+    }
 
     const formData = await req.formData()
     const files = formData.getAll('files') as File[]
