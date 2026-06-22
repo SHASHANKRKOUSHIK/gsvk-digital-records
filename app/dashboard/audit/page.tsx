@@ -53,7 +53,7 @@ export default async function AuditPage({
 
       {/* Action filter */}
       <div className="flex gap-2 flex-wrap">
-        {['', 'CREATE', 'UPDATE', 'DELETE'].map(a => (
+        {['', 'CREATED', 'UPDATED', 'DELETED'].map(a => (
           <Link
             key={a}
             href={`/dashboard/audit${a ? `?action=${a}` : ''}`}
