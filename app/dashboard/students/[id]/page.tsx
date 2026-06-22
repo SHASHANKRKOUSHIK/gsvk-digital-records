@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { formatDate, formatDateTime, bloodGroupLabel } from '@/lib/utils'
 import { Edit, ExternalLink, Download, FileText, Clock, QrCode, FileDown } from 'lucide-react'
 import Image from 'next/image'
+import AdmissionPdfUpload from '@/components/forms/AdmissionPdfUpload'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
