@@ -34,6 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const {
       fatherName, motherName, guardianName, phone, alternatePhone,
       email, address, city, district, state, pincode, occupation,
+      annualIncome, permanentAddress,
       ...studentData
     } = body
 
@@ -53,11 +54,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (existingParent) {
       await prisma.parent.update({
         where: { id: existingParent.id },
-        data: { fatherName, motherName, guardianName, phone, alternatePhone, email, address, city, district, state, pincode, occupation },
+        data: { fatherName, motherName, guardianName, phone, alternatePhone, email, address, city, district, state, pincode, occupation, annualIncome, permanentAddress },
       })
     } else {
       await prisma.parent.create({
-        data: { studentId: id, fatherName, motherName, guardianName, phone, alternatePhone, email, address, city, district, state, pincode, occupation },
+        data: { studentId: id, fatherName, motherName, guardianName, phone, alternatePhone, email, address, city, district, state, pincode, occupation, annualIncome, permanentAddress },
       })
     }
 
@@ -68,12 +69,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         action: 'UPDATE',
         entity: 'Student',
         entityId: id,
-        // JSON.parse(JSON.stringify(...)) produces a genuinely plain,
-        // JSON-safe object that satisfies Prisma's recursive InputJsonValue
-        // type. A direct `as Record<string, unknown>` cast doesn't work here
-        // because Prisma's Student model includes Date fields, which aren't
-        // structurally valid JSON values - this round-trip also correctly
-        // converts those Dates to ISO strings for storage.
         oldData: old ? JSON.parse(JSON.stringify(old)) : null,
         newData: body,
       },
@@ -102,4 +97,3 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
-

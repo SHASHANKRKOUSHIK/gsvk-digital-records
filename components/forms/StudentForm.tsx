@@ -25,6 +25,12 @@ const schema = z.object({
   previousSchool: z.string().optional(),
   tcNumber: z.string().optional(),
   remarks: z.string().optional(),
+  placeOfBirth: z.string().optional(),
+  siblings: z.string().optional(),
+  motherTongue: z.string().optional(),
+  penNumber: z.string().optional(),
+  satsNumber: z.string().optional(),
+  apaarId: z.string().optional(),
   fatherName: z.string().optional(),
   motherName: z.string().optional(),
   guardianName: z.string().optional(),
@@ -37,6 +43,8 @@ const schema = z.object({
   state: z.string().optional(),
   pincode: z.string().optional(),
   occupation: z.string().optional(),
+  annualIncome: z.string().optional(),
+  permanentAddress: z.string().optional(),
 })
 
 interface Props {
@@ -50,8 +58,9 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
   const [error, setError] = useState('')
   const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null)
   const [skipDup, setSkipDup] = useState(false)
+  const [sameAsPresentAddress, setSameAsPresentAddress] = useState(false)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<StudentFormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<StudentFormData>({
     resolver: zodResolver(schema),
     defaultValues: defaultValues || {
       gender: 'MALE',
@@ -60,6 +69,16 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
       admissionDate: new Date().toISOString().split('T')[0],
     },
   })
+
+  function handleSameAddressToggle(checked: boolean) {
+    setSameAsPresentAddress(checked)
+    if (checked) {
+      const present = [
+        watch('address'), watch('city'), watch('district'), watch('state'), watch('pincode'),
+      ].filter(Boolean).join(', ')
+      setValue('permanentAddress', present)
+    }
+  }
 
   async function saveStudent(data: StudentFormData) {
     setLoading(true)
@@ -190,6 +209,9 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
           <Field label="Date of Birth *" error={errors.dateOfBirth?.message}>
             <input {...register('dateOfBirth')} type="date" className="form-input" />
           </Field>
+          <Field label="Place of Birth">
+            <input {...register('placeOfBirth')} placeholder="City, State" className="form-input" />
+          </Field>
           <Field label="Blood Group">
             <select {...register('bloodGroup')} className="form-input">
               {BLOOD_GROUPS.map(bg => (
@@ -199,6 +221,12 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
           </Field>
           <Field label="Aadhar Number">
             <input {...register('aadharNumber')} placeholder="12-digit Aadhar" maxLength={12} className="form-input" />
+          </Field>
+          <Field label="Mother Tongue">
+            <input {...register('motherTongue')} placeholder="e.g. Kannada, Hindi" className="form-input" />
+          </Field>
+          <Field label="Siblings">
+            <input {...register('siblings')} placeholder="Names / count of siblings" className="form-input" />
           </Field>
           <Field label="Religion">
             <input {...register('religion')} placeholder="Religion" className="form-input" />
@@ -211,6 +239,15 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
           </Field>
           <Field label="TC Number">
             <input {...register('tcNumber')} placeholder="Transfer certificate number" className="form-input" />
+          </Field>
+          <Field label="PEN No.">
+            <input {...register('penNumber')} placeholder="Permanent Education Number" className="form-input" />
+          </Field>
+          <Field label="SATS No.">
+            <input {...register('satsNumber')} placeholder="SATS number" className="form-input" />
+          </Field>
+          <Field label="Apaar ID No.">
+            <input {...register('apaarId')} placeholder="APAAR ID" className="form-input" />
           </Field>
           <Field label="Remarks" wide>
             <textarea {...register('remarks')} rows={2} placeholder="Any additional remarks"
@@ -243,13 +280,16 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
           <Field label="Occupation">
             <input {...register('occupation')} placeholder="Occupation" className="form-input" />
           </Field>
+          <Field label="Annual Income">
+            <input {...register('annualIncome')} placeholder="e.g. ₹3,00,000" className="form-input" />
+          </Field>
         </Grid>
       </Section>
 
       {/* Address */}
       <Section title="Address">
         <Grid>
-          <Field label="Street Address" wide>
+          <Field label="Present Postal Address" wide>
             <input {...register('address')} placeholder="House/Flat, Street, Colony" className="form-input" />
           </Field>
           <Field label="City">
@@ -265,6 +305,27 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
             <input {...register('pincode')} placeholder="6-digit PIN" maxLength={6} className="form-input" />
           </Field>
         </Grid>
+
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <label className="flex items-center gap-2 mb-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sameAsPresentAddress}
+              onChange={e => handleSameAddressToggle(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-600">Permanent address same as present address</span>
+          </label>
+          <Field label="Permanent Postal Address" wide>
+            <textarea
+              {...register('permanentAddress')}
+              rows={2}
+              disabled={sameAsPresentAddress}
+              placeholder="Full permanent address, if different from above"
+              className="form-input resize-none disabled:bg-gray-50 disabled:text-gray-400"
+            />
+          </Field>
+        </div>
       </Section>
 
       {/* Submit */}

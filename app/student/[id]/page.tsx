@@ -90,9 +90,12 @@ export default async function StudentProfilePage({ params }: Props) {
               {/* Personal */}
               <Section title="Personal Details" icon={<User className="w-4 h-4" />}>
                 <Row label="Date of Birth" value={formatDate(student.dateOfBirth)} />
+                {student.placeOfBirth && <Row label="Place of Birth" value={student.placeOfBirth} />}
                 <Row label="Gender" value={student.gender} />
                 <Row label="Blood Group" value={bloodGroupLabel(student.bloodGroup)} />
                 {student.aadharNumber && <Row label="Aadhar No." value={`XXXX XXXX ${student.aadharNumber.slice(-4)}`} />}
+                {student.motherTongue && <Row label="Mother Tongue" value={student.motherTongue} />}
+                {student.siblings && <Row label="Siblings" value={student.siblings} />}
                 {student.religion && <Row label="Religion" value={student.religion} />}
                 {student.caste && <Row label="Caste" value={student.caste} />}
               </Section>
@@ -106,6 +109,9 @@ export default async function StudentProfilePage({ params }: Props) {
                 <Row label="Academic Year" value={student.academicYear} />
                 {student.previousSchool && <Row label="Previous School" value={student.previousSchool} />}
                 {student.tcNumber && <Row label="TC Number" value={student.tcNumber} />}
+                {student.penNumber && <Row label="PEN No." value={student.penNumber} />}
+                {student.satsNumber && <Row label="SATS No." value={student.satsNumber} />}
+                {student.apaarId && <Row label="Apaar ID No." value={student.apaarId} />}
               </Section>
 
               {/* Parents */}
@@ -118,17 +124,19 @@ export default async function StudentProfilePage({ params }: Props) {
                   {parent.alternatePhone && <Row label="Alt. Phone" value={parent.alternatePhone} />}
                   {parent.email && <Row label="Email" value={parent.email} />}
                   {parent.occupation && <Row label="Occupation" value={parent.occupation} />}
+                  {parent.annualIncome && <Row label="Annual Income" value={parent.annualIncome} />}
                 </Section>
               )}
 
               {/* Address */}
-              {parent && (parent.address || parent.city) && (
+              {parent && (parent.address || parent.city || parent.permanentAddress) && (
                 <Section title="Address" icon={<MapPin className="w-4 h-4" />}>
-                  {parent.address && <Row label="Street" value={parent.address} />}
+                  {parent.address && <Row label="Present Address" value={parent.address} />}
                   {parent.city && <Row label="City" value={parent.city} />}
                   {parent.district && <Row label="District" value={parent.district} />}
                   {parent.state && <Row label="State" value={parent.state} />}
                   {parent.pincode && <Row label="Pincode" value={parent.pincode} />}
+                  {parent.permanentAddress && <Row label="Permanent Address" value={parent.permanentAddress} />}
                 </Section>
               )}
             </div>

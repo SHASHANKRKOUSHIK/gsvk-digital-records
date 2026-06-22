@@ -3,8 +3,6 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate, formatDateTime, bloodGroupLabel } from '@/lib/utils'
 import { Edit, ExternalLink, Download, FileText, Clock, QrCode } from 'lucide-react'
-import { getServerUser } from '@/lib/auth'
-import DeleteStudentButton from '@/components/forms/DeleteStudentButton'
 import Image from 'next/image'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,8 +23,6 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
 
   if (!student) notFound()
   const parent = student.parents[0]
-  const currentUser = await getServerUser()
-  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN' 
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -54,9 +50,6 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium transition-colors">
             <Edit className="w-3.5 h-3.5" /> Edit
           </Link>
-          {isSuperAdmin && (
-            <DeleteStudentButton studentId={id} studentName={student.studentName} />
-          )}
         </div>
       </div>
 
@@ -69,8 +62,11 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
               <Field label="Student Name" value={student.studentName} />
               <Field label="Gender" value={student.gender} />
               <Field label="Date of Birth" value={formatDate(student.dateOfBirth)} />
+              <Field label="Place of Birth" value={student.placeOfBirth || '—'} />
               <Field label="Blood Group" value={bloodGroupLabel(student.bloodGroup)} />
               <Field label="Aadhar No." value={student.aadharNumber ? `XXXX XXXX ${student.aadharNumber.slice(-4)}` : '—'} />
+              <Field label="Mother Tongue" value={student.motherTongue || '—'} />
+              <Field label="Siblings" value={student.siblings || '—'} />
               <Field label="Religion" value={student.religion || '—'} />
               <Field label="Caste" value={student.caste || '—'} />
             </Grid>
@@ -86,6 +82,9 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
               <Field label="Academic Year" value={student.academicYear} />
               <Field label="Previous School" value={student.previousSchool || '—'} />
               <Field label="TC Number" value={student.tcNumber || '—'} />
+              <Field label="PEN No." value={student.penNumber || '—'} />
+              <Field label="SATS No." value={student.satsNumber || '—'} />
+              <Field label="Apaar ID No." value={student.apaarId || '—'} />
             </Grid>
             {student.remarks && (
               <div className="mt-3 p-3 bg-gray-50 rounded-lg">
@@ -106,13 +105,20 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 <Field label="Alt. Phone" value={parent.alternatePhone || '—'} />
                 <Field label="Email" value={parent.email || '—'} />
                 <Field label="Occupation" value={parent.occupation || '—'} />
+                <Field label="Annual Income" value={parent.annualIncome || '—'} />
               </Grid>
               {(parent.address || parent.city) && (
                 <div className="mt-3 pt-3 border-t border-gray-100">
-                  <p className="text-xs font-medium text-gray-500 mb-2">Address</p>
+                  <p className="text-xs font-medium text-gray-500 mb-2">Present Address</p>
                   <p className="text-sm text-gray-700">
                     {[parent.address, parent.city, parent.district, parent.state, parent.pincode].filter(Boolean).join(', ')}
                   </p>
+                </div>
+              )}
+              {parent.permanentAddress && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Permanent Address</p>
+                  <p className="text-sm text-gray-700">{parent.permanentAddress}</p>
                 </div>
               )}
             </Card>

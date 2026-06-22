@@ -28,6 +28,12 @@ export default async function EditStudentPage({ params }: { params: Promise<{ id
     previousSchool: student.previousSchool || '',
     tcNumber: student.tcNumber || '',
     remarks: student.remarks || '',
+    placeOfBirth: student.placeOfBirth || '',
+    siblings: student.siblings || '',
+    motherTongue: student.motherTongue || '',
+    penNumber: student.penNumber || '',
+    satsNumber: student.satsNumber || '',
+    apaarId: student.apaarId || '',
     fatherName: parent?.fatherName || '',
     motherName: parent?.motherName || '',
     guardianName: parent?.guardianName || '',
@@ -40,6 +46,8 @@ export default async function EditStudentPage({ params }: { params: Promise<{ id
     state: parent?.state || '',
     pincode: parent?.pincode || '',
     occupation: parent?.occupation || '',
+    annualIncome: parent?.annualIncome || '',
+    permanentAddress: parent?.permanentAddress || '',
   }
 
   return (

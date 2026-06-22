@@ -85,8 +85,17 @@ model Student {
   photoUrl        String?
   qrCode          String?
   isActive        Boolean    @default(true)
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+
+  // New fields
+  placeOfBirth String?
+  siblings     String?
+  motherTongue String?
+  penNumber    String?
+  satsNumber   String?
+  apaarId      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   parents   Parent[]
   documents Document[]
@@ -116,8 +125,13 @@ model Parent {
   state          String?
   pincode        String?
   occupation     String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+
+  // New fields
+  annualIncome      String?
+  permanentAddress  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 

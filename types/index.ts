@@ -24,6 +24,12 @@ export interface Student {
   photoUrl?: string | null
   qrCode?: string | null
   isActive: boolean
+  placeOfBirth?: string | null
+  siblings?: string | null
+  motherTongue?: string | null
+  penNumber?: string | null
+  satsNumber?: string | null
+  apaarId?: string | null
   createdAt: string
   updatedAt: string
   parents?: Parent[]
@@ -46,6 +52,8 @@ export interface Parent {
   state?: string | null
   pincode?: string | null
   occupation?: string | null
+  annualIncome?: string | null
+  permanentAddress?: string | null
 }
 
 export interface Document {
@@ -106,6 +114,12 @@ export interface StudentFormData {
   previousSchool?: string
   tcNumber?: string
   remarks?: string
+  placeOfBirth?: string
+  siblings?: string
+  motherTongue?: string
+  penNumber?: string
+  satsNumber?: string
+  apaarId?: string
   fatherName?: string
   motherName?: string
   guardianName?: string
@@ -118,6 +132,8 @@ export interface StudentFormData {
   state?: string
   pincode?: string
   occupation?: string
+  annualIncome?: string
+  permanentAddress?: string
 }
 
 export interface DashboardStats {

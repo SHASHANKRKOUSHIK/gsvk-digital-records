@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
     const {
       fatherName, motherName, guardianName, phone, alternatePhone,
       email, address, city, district, state, pincode, occupation,
+      annualIncome, permanentAddress,
       ...studentData
     } = body
 
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
           create: [{
             fatherName, motherName, guardianName, phone, alternatePhone,
             email, address, city, district, state, pincode, occupation,
+            annualIncome, permanentAddress,
           }],
         },
       },
