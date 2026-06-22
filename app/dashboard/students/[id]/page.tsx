@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate, formatDateTime, bloodGroupLabel } from '@/lib/utils'
-import { Edit, ExternalLink, Download, FileText, Clock, QrCode } from 'lucide-react'
+import { Edit, ExternalLink, Download, FileText, Clock, QrCode, FileDown } from 'lucide-react'
 import Image from 'next/image'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -178,6 +178,17 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* Admission Form PDF */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <FileDown className="w-3.5 h-3.5" /> Admission Form PDF
+            </p>
+            <AdmissionPdfUpload
+              studentId={id}
+              existingPdfUrl={student.admissionFormPdfUrl}
+            />
           </div>
 
           {/* Audit log */}

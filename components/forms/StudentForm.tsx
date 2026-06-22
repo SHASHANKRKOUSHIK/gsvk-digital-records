@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { CLASSES, ACADEMIC_YEARS, BLOOD_GROUP_LABELS, BLOOD_GROUPS } from '@/types'
 import type { StudentFormData } from '@/types'
 import { Loader2, AlertTriangle } from 'lucide-react'
+import AdmissionPdfUpload from '@/components/forms/AdmissionPdfUpload'
 
 const schema = z.object({
   admissionNumber: z.string().min(1, 'Required'),
@@ -50,15 +51,18 @@ const schema = z.object({
 interface Props {
   studentId?: string
   defaultValues?: Partial<StudentFormData>
+  /** PDF file passed in from parent (e.g. OCR review page) */
+  admissionPdfFile?: File | null
 }
 
-export default function StudentForm({ studentId, defaultValues }: Props) {
+export default function StudentForm({ studentId, defaultValues, admissionPdfFile }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null)
   const [skipDup, setSkipDup] = useState(false)
   const [sameAsPresentAddress, setSameAsPresentAddress] = useState(false)
+  const [pdfFile, setPdfFile] = useState<File | null>(admissionPdfFile ?? null)
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<StudentFormData>({
     resolver: zodResolver(schema),
@@ -93,6 +97,18 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed to save')
+
+      // If a PDF was attached, upload it now that we have the student ID
+      if (pdfFile) {
+        try {
+          const fd = new FormData()
+          fd.append('file', pdfFile)
+          await fetch(`/api/students/${json.id}/admission-pdf`, { method: 'POST', body: fd })
+        } catch {
+          // Non-fatal — student is saved, PDF upload failure shouldn't block navigation
+        }
+      }
+
       router.push(`/student/${json.id}`)
       router.refresh()
     } catch (err) {
@@ -327,6 +343,24 @@ export default function StudentForm({ studentId, defaultValues }: Props) {
           </Field>
         </div>
       </Section>
+
+      {/* Admission Form PDF */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h3 className="form-section-title">Original Admission Form (PDF)</h3>
+        <p className="text-xs text-gray-400 mb-4">
+          Optional — attach a scan of the physical admission form for reference.
+          The file will be automatically compressed and stored securely.
+        </p>
+        <AdmissionPdfUpload
+          studentId={studentId}
+          onFileSelected={setPdfFile}
+        />
+        {pdfFile && !studentId && (
+          <p className="text-xs text-blue-600 mt-2">
+            PDF will be uploaded automatically when you click "Save Admission" below.
+          </p>
+        )}
+      </div>
 
       {/* Submit */}
       <div className="flex items-center gap-3 pt-2 pb-8">

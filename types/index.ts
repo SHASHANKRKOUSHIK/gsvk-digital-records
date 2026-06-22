@@ -30,6 +30,8 @@ export interface Student {
   penNumber?: string | null
   satsNumber?: string | null
   apaarId?: string | null
+  admissionFormPdf?: string | null
+  admissionFormPdfUrl?: string | null
   createdAt: string
   updatedAt: string
   parents?: Parent[]

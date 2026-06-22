@@ -82,9 +82,11 @@ model Student {
   previousSchool  String?
   tcNumber        String?
   remarks         String?
-  photoUrl        String?
-  qrCode          String?
-  isActive        Boolean    @default(true)
+  photoUrl             String?
+  qrCode               String?
+  admissionFormPdf     String?   // Supabase storage path
+  admissionFormPdfUrl  String?   // Public URL
+  isActive             Boolean   @default(true)
 
   // New fields
   placeOfBirth String?

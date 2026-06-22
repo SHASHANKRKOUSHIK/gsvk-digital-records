@@ -2,9 +2,9 @@
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, ScanLine, CheckCircle, Loader2, FileImage, AlertCircle, Edit, Info } from 'lucide-react'
-import Link from 'next/link'
+import { Upload, ScanLine, CheckCircle, Loader2, FileImage, AlertCircle, Edit } from 'lucide-react'
 import StudentForm from '@/components/forms/StudentForm'
+import AdmissionPdfUpload from '@/components/forms/AdmissionPdfUpload'
 import type { StudentFormData } from '@/types'
 
 type Step = 'upload' | 'processing' | 'review' | 'done'
@@ -16,16 +16,15 @@ export default function OcrPage() {
   const [extractedData, setExtractedData] = useState<Partial<StudentFormData>>({})
   const [rawText, setRawText] = useState('')
   const [error, setError] = useState('')
-  const [ocrUnavailable, setOcrUnavailable] = useState(false)
   const [jobId, setJobId] = useState('')
   const [showRaw, setShowRaw] = useState(false)
+  const [ocrPdfFile, setOcrPdfFile] = useState<File | null>(null)
 
   const onDrop = useCallback((accepted: File[]) => {
     const f = accepted[0]
     if (!f) return
     setFile(f)
     setError('')
-    setOcrUnavailable(false)
     if (f.type.startsWith('image/')) {
       setPreview(URL.createObjectURL(f))
     }
@@ -49,10 +48,7 @@ export default function OcrPage() {
     try {
       const res = await fetch('/api/ocr', { method: 'POST', body: fd })
       const data = await res.json()
-      if (!res.ok) {
-        if (data.ocrUnavailable) setOcrUnavailable(true)
-        throw new Error(data.error || 'OCR failed')
-      }
+      if (!res.ok) throw new Error(data.error || 'OCR failed')
       setExtractedData(data.extractedData || {})
       setRawText(data.rawText || '')
       setJobId(data.jobId || '')
@@ -70,7 +66,6 @@ export default function OcrPage() {
     setExtractedData({})
     setRawText('')
     setError('')
-    setOcrUnavailable(false)
     setJobId('')
   }
 
@@ -100,26 +95,7 @@ export default function OcrPage() {
         ))}
       </div>
 
-      {error && ocrUnavailable && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-          <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-blue-800 font-medium text-sm">OCR isn't available on the live site</p>
-            <p className="text-blue-700 text-sm mt-1">
-              OCR extraction only works when this app is running on your own computer, not on the deployed website.
-              You can still add this student's details directly.
-            </p>
-            <Link
-              href="/dashboard/students/new"
-              className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-blue-700 hover:text-blue-900 underline"
-            >
-              Go to manual entry →
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {error && !ocrUnavailable && (
+      {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
           <p className="text-red-700 text-sm">{error}</p>
@@ -216,7 +192,23 @@ export default function OcrPage() {
             <p className="text-sm text-amber-700">Pre-filled from OCR. Please review all fields carefully before saving.</p>
           </div>
 
-          <StudentForm defaultValues={extractedData} />
+          {/* Original form PDF — optional, uploaded alongside student save */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
+              Original Admission Form PDF
+            </h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Optional — attach the scanned PDF you just uploaded for OCR. It will be saved with the student record.
+            </p>
+            <AdmissionPdfUpload onFileSelected={setOcrPdfFile} />
+            {ocrPdfFile && (
+              <p className="text-xs text-blue-600 mt-2">
+                PDF will be uploaded automatically when you save below.
+              </p>
+            )}
+          </div>
+
+          <StudentForm defaultValues={extractedData} admissionPdfFile={ocrPdfFile} />
         </div>
       )}
     </div>
