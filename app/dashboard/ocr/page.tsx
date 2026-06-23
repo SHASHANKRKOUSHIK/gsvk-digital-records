@@ -25,6 +25,7 @@ export default function OcrPage() {
     if (!f) return
     setFile(f)
     setError('')
+    setOcrPdfFile(null)
     if (f.type.startsWith('image/')) {
       setPreview(URL.createObjectURL(f))
     }
@@ -32,7 +33,7 @@ export default function OcrPage() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': ['.jpg', '.jpeg', '.png'], 'application/pdf': ['.pdf'] },
+    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'], 'application/pdf': ['.pdf'] },
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,
   })
@@ -67,6 +68,7 @@ export default function OcrPage() {
     setRawText('')
     setError('')
     setJobId('')
+    setOcrPdfFile(null)
   }
 
   return (
@@ -76,21 +78,21 @@ export default function OcrPage() {
         <p className="text-sm text-gray-500 mt-1">Upload scanned admission forms to automatically extract student data</p>
       </div>
 
-      {/* Steps indicator */}
-      <div className="flex items-center gap-2 text-xs font-medium">
+      {/* Step indicator */}
+      <div className="flex items-center gap-3">
         {(['upload', 'processing', 'review'] as Step[]).map((s, i) => (
           <div key={s} className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
               step === s ? 'bg-blue-700 text-white' :
               (['processing', 'review', 'done'].indexOf(step) > i) ? 'bg-green-500 text-white' :
-              'bg-gray-200 text-gray-500'
+              'bg-gray-100 text-gray-400'
             }`}>
               {(['processing', 'review', 'done'].indexOf(step) > i) ? '✓' : i + 1}
             </div>
-            <span className={step === s ? 'text-blue-700' : 'text-gray-400'}>
+            <span className={`text-sm ${step === s ? 'text-blue-700 font-medium' : 'text-gray-400'}`}>
               {s === 'upload' ? 'Upload' : s === 'processing' ? 'Process OCR' : 'Review & Save'}
             </span>
-            {i < 2 && <div className="w-8 h-px bg-gray-200" />}
+            {i < 2 && <div className="w-8 h-px bg-gray-200 mx-1" />}
           </div>
         ))}
       </div>
@@ -103,62 +105,48 @@ export default function OcrPage() {
       )}
 
       {step === 'upload' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div>
-            <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
-              isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-            }`}>
-              <input {...getInputProps()} />
-              <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="font-medium text-gray-600">Drop file here or click to browse</p>
-              <p className="text-xs text-gray-400 mt-1">JPG, PNG, PDF up to 10MB</p>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
+          <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
+            isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+          }`}>
+            <input {...getInputProps()} />
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
+              <Upload className="w-7 h-7 text-blue-600" />
             </div>
-
-            {file && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center gap-3">
-                <FileImage className="w-8 h-8 text-blue-500 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-700 truncate">{file.name}</p>
-                  <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(0)} KB</p>
+            {file ? (
+              <div>
+                <div className="flex items-center gap-2 justify-center mb-2">
+                  <FileImage className="w-5 h-5 text-blue-600" />
+                  <p className="font-medium text-gray-800">{file.name}</p>
                 </div>
-                <button onClick={processOcr}
-                  className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                  <ScanLine className="w-4 h-4" />
-                  Extract Data
-                </button>
+                <p className="text-sm text-gray-400">{(file.size / 1024).toFixed(0)} KB · Click to change</p>
+              </div>
+            ) : (
+              <div>
+                <p className="font-semibold text-gray-700">Drop your admission form here</p>
+                <p className="text-sm text-gray-400 mt-1">JPG, PNG, PDF · Max 10 MB</p>
               </div>
             )}
           </div>
 
-          <div className="bg-gray-50 rounded-xl border border-gray-100 p-5">
-            {preview ? (
-              <img src={preview} alt="Preview" className="w-full rounded-lg object-contain max-h-64" />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-40 text-gray-300">
-                <FileImage className="w-12 h-12 mb-2" />
-                <p className="text-sm">File preview</p>
-              </div>
-            )}
-            <div className="mt-4 space-y-2 text-xs text-gray-500">
-              <p className="font-semibold text-gray-600">Supported fields:</p>
-              <div className="grid grid-cols-2 gap-1">
-                {['Student Name', 'Admission No.', 'Date of Birth', 'Father Name', 'Mother Name', 'Phone', 'Class', 'Address', 'Blood Group', 'Aadhar No.'].map(f => (
-                  <div key={f} className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
-                    {f}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          {preview && (
+            <img src={preview} alt="Preview" className="w-full rounded-lg object-contain max-h-64 border border-gray-100" />
+          )}
+
+          {file && (
+            <button onClick={processOcr}
+              className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-xl font-semibold transition-colors">
+              <ScanLine className="w-5 h-5" /> Extract Data with Google Vision OCR
+            </button>
+          )}
         </div>
       )}
 
       {step === 'processing' && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-16 text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <h3 className="font-semibold text-gray-800 text-lg">Processing with Google Vision OCR</h3>
-          <p className="text-sm text-gray-500 mt-2">Extracting text and mapping fields...</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
+          <p className="font-semibold text-gray-700">Processing with Google Vision OCR</p>
+          <p className="text-sm text-gray-400">Extracting text and mapping fields...</p>
         </div>
       )}
 
@@ -192,13 +180,11 @@ export default function OcrPage() {
             <p className="text-sm text-amber-700">Pre-filled from OCR. Please review all fields carefully before saving.</p>
           </div>
 
-          {/* Original form PDF — optional, uploaded alongside student save */}
+          {/* Optional: attach original PDF */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
-              Original Admission Form PDF
-            </h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-1">Original Admission Form PDF</h3>
             <p className="text-xs text-gray-400 mb-3">
-              Optional — attach the scanned PDF you just uploaded for OCR. It will be saved with the student record.
+              Optional — attach the scanned PDF for reference. It will be saved with the student record.
             </p>
             <AdmissionPdfUpload onFileSelected={setOcrPdfFile} />
             {ocrPdfFile && (

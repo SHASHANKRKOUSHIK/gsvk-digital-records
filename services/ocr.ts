@@ -1,45 +1,66 @@
-import path from 'path'
 import type { StudentFormData } from '@/types'
 
 /**
- * Free, local OCR using Tesseract.js — no API key, no billing required.
- * Runs entirely on your local machine.
+ * Google Cloud Vision API — OCR for admission forms.
  *
- * NOTE: OCR is disabled on the live Vercel deployment (set OCR_DISABLED=1
- * in Vercel env vars) because Tesseract.js needs filesystem access to load
- * its WASM binary and language data, which Vercel's read-only serverless
- * functions don't support. This file is only executed locally.
+ * Works on both local development AND the live Vercel deployment since it's
+ * a pure HTTPS API call with no filesystem or WASM requirements.
  *
- * WINDOWS + Next.js webpack workaround:
- * We use path.join(process.cwd(), 'node_modules', ...) instead of
- * require.resolve() because webpack statically rewrites require.resolve()
- * calls at build time into bare unresolved strings, causing ERR_WORKER_PATH
- * when Node's worker_threads tries to spawn the Tesseract worker.
+ * Pricing: first 1,000 images/month free, then $1.50 per 1,000 images.
+ * For a school admission system this will almost always stay within the
+ * free tier.
+ *
+ * Set GOOGLE_VISION_API_KEY in your .env (local) and Vercel environment
+ * variables (production).
  */
-function getTesseractWorkerPath(): string {
-  return path.join(
-    process.cwd(),
-    'node_modules',
-    'tesseract.js',
-    'src',
-    'worker-script',
-    'node',
-    'index.js'
-  )
-}
 
+const VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate'
+
+/**
+ * Extract text from a Buffer using Google Vision API's TEXT_DETECTION feature.
+ * The buffer is sent as base64-encoded image content.
+ */
 export async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Tesseract = require('tesseract.js')
-  const worker = await Tesseract.createWorker('eng', 1, {
-    workerPath: getTesseractWorkerPath(),
+  const apiKey = process.env.GOOGLE_VISION_API_KEY
+  if (!apiKey) throw new Error('GOOGLE_VISION_API_KEY is not set')
+
+  const base64 = buffer.toString('base64')
+
+  const response = await fetch(`${VISION_API_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: [
+        {
+          image: { content: base64 },
+          features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+          imageContext: {
+            languageHints: ['en', 'hi'],  // English + Hindi for Indian forms
+          },
+        },
+      ],
+    }),
   })
-  try {
-    const { data } = await worker.recognize(buffer)
-    return data.text || ''
-  } finally {
-    await worker.terminate()
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Vision API HTTP error ${response.status}: ${text}`)
   }
+
+  const data = await response.json()
+
+  // Check for API-level errors
+  if (data.error) {
+    throw new Error(`Vision API error: ${data.error.message}`)
+  }
+
+  const result = data.responses?.[0]
+  if (result?.error) {
+    throw new Error(`Vision API request error: ${result.error.message}`)
+  }
+
+  // TEXT_DETECTION returns the full document text in textAnnotations[0].description
+  return result?.textAnnotations?.[0]?.description || ''
 }
 
 export async function extractTextFromBase64(base64: string, _mimeType: string): Promise<string> {
@@ -50,17 +71,20 @@ export async function extractTextFromBase64(base64: string, _mimeType: string): 
 export async function extractTextFromImage(imageUrl: string): Promise<string> {
   const res = await fetch(imageUrl)
   const arrayBuffer = await res.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-  return extractTextFromBuffer(buffer)
+  return extractTextFromBuffer(Buffer.from(arrayBuffer))
 }
 
+/**
+ * Parse the raw OCR text and extract structured student form fields.
+ * Uses regex patterns tuned for Indian school admission forms.
+ */
 export function parseOcrText(text: string): Partial<StudentFormData> {
   const extracted: Partial<StudentFormData> = {}
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
   const fullText = lines.join(' ')
 
   const patterns: Record<string, RegExp[]> = {
-    // ── Original fields ──────────────────────────────────────────────────────
+    // ── Core fields ──────────────────────────────────────────────────────────
     studentName: [
       /student['s\s]*\s*name\s*[:\-]?\s*([A-Za-z\s]{3,40})/i,
       /name\s*of\s*(?:the\s*)?student\s*[:\-]?\s*([A-Za-z\s]{3,40})/i,
@@ -120,29 +144,32 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
     academicYear: [
       /academic\s*year\s*[:\-]?\s*(\d{4}[\-\/]\d{2,4})/i,
       /session\s*[:\-]?\s*(\d{4}[\-\/]\d{2,4})/i,
-      /year\s*[:\-]?\s*(\d{4}[\-\/]\d{2,4})/i,
+    ],
+    caste: [
+      /caste\s*[:\-]?\s*([A-Za-z\s]{2,20})/i,
+      /category\s*[:\-]?\s*(general|obc|sc|st|others?)\b/i,
+    ],
+    previousSchool: [
+      /previous\s*school\s*[:\-]?\s*(.{5,80})/i,
+      /last\s*(?:attended\s*)?school\s*[:\-]?\s*(.{5,80})/i,
     ],
 
     // ── New fields ────────────────────────────────────────────────────────────
     placeOfBirth: [
       /place\s*of\s*birth\s*[:\-]?\s*([A-Za-z\s,\.]{3,60})/i,
       /birth\s*place\s*[:\-]?\s*([A-Za-z\s,\.]{3,60})/i,
-      /p\.?\s*o\.?\s*b\.?\s*[:\-]?\s*([A-Za-z\s,\.]{3,60})/i,
     ],
     motherTongue: [
       /mother\s*tongue\s*[:\-]?\s*([A-Za-z\s]{3,30})/i,
       /native\s*language\s*[:\-]?\s*([A-Za-z\s]{3,30})/i,
-      /m\.?\s*t\.?\s*[:\-]?\s*([A-Za-z\s]{3,30})/i,
     ],
     siblings: [
       /siblings?\s*[:\-]?\s*(.{2,60})/i,
       /no\.?\s*of\s*siblings?\s*[:\-]?\s*(\d+)/i,
-      /brothers?\s*(?:and|&)\s*sisters?\s*[:\-]?\s*(.{2,40})/i,
     ],
     penNumber: [
       /p\.?\s*e\.?\s*n\.?\s*(?:no|number)?\.?\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
       /permanent\s*education\s*(?:no|number)\.?\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
-      /pen\s*[:\-]\s*([A-Z0-9]{6,20})/i,
     ],
     satsNumber: [
       /s\.?\s*a\.?\s*t\.?\s*s\.?\s*(?:no|number)?\.?\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
@@ -150,18 +177,19 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
     ],
     apaarId: [
       /apaar\s*(?:id|no|number)?\.?\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
-      /a\.?\s*p\.?\s*a\.?\s*a\.?\s*r\.?\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
       /abc\s*id\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
     ],
     annualIncome: [
       /annual\s*income\s*[:\-]?\s*([\d,\s\.]+)/i,
       /family\s*(?:annual\s*)?income\s*[:\-]?\s*([\d,\s\.]+)/i,
       /income\s*(?:per\s*annum|p\.?\s*a\.?)?\s*[:\-]?\s*([\d,\s\.]+)/i,
-      /yearly\s*income\s*[:\-]?\s*([\d,\s\.]+)/i,
     ],
     permanentAddress: [
       /permanent\s*(?:postal\s*)?address\s*[:\-]?\s*(.{10,120})/i,
       /perm(?:anent)?\s*addr(?:ess)?\s*[:\-]?\s*(.{10,120})/i,
+    ],
+    occupation: [
+      /(?:father['s\s]*)?occupation\s*[:\-]?\s*([A-Za-z\s]{3,30})/i,
     ],
   }
 
@@ -171,7 +199,6 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
       if (match?.[1]) {
         let value = match[1].trim()
 
-        // Field-specific post-processing
         if (field === 'gender') {
           value = value.toLowerCase().startsWith('f') ? 'FEMALE' : 'MALE'
         } else if (field === 'bloodGroup') {
@@ -191,14 +218,12 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
           value = value.replace(/\D/g, '').slice(-10)
           if (value.length !== 10) continue
         } else if (field === 'annualIncome') {
-          // Strip trailing text like "per year", "p.a." etc.
           value = value.replace(/\s*(per|p\.a|annum|year|lakh|lac).*/i, '').trim()
         } else if (
           field === 'studentName' || field === 'fatherName' ||
           field === 'motherName' || field === 'placeOfBirth' ||
           field === 'motherTongue'
         ) {
-          // Strip common trailing OCR junk after names
           value = value
             .replace(/\s*(s\/o|d\/o|w\/o|c\/o|class|std|section|dob|adm|no|roll)\s*$/i, '')
             .trim()
