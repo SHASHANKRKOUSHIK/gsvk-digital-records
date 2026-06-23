@@ -3,40 +3,48 @@ import type { StudentFormData } from '@/types'
 /**
  * Google Cloud Vision API — OCR for admission forms.
  *
- * Works on both local development AND the live Vercel deployment since it's
- * a pure HTTPS API call with no filesystem or WASM requirements.
+ * For images (JPG, PNG, WebP): uses images:annotate with TEXT_DETECTION.
+ * For PDFs: uses files:annotate with DOCUMENT_TEXT_DETECTION which handles
+ * PDFs natively (up to 5 pages) without needing image conversion.
  *
- * Pricing: first 1,000 images/month free, then $1.50 per 1,000 images.
- * For a school admission system this will almost always stay within the
- * free tier.
- *
- * Set GOOGLE_VISION_API_KEY in your .env (local) and Vercel environment
- * variables (production).
+ * Works on both local dev AND live Vercel — pure HTTPS, no filesystem needed.
  */
 
-const VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate'
+const VISION_BASE = 'https://vision.googleapis.com/v1'
+
+function getApiKey(): string {
+  const key = process.env.GOOGLE_VISION_API_KEY
+  if (!key) throw new Error('GOOGLE_VISION_API_KEY environment variable is not set')
+  return key
+}
 
 /**
- * Extract text from a Buffer using Google Vision API's TEXT_DETECTION feature.
- * The buffer is sent as base64-encoded image content.
+ * Detect whether a buffer is a PDF by checking its magic bytes (%PDF header).
  */
-export async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
-  const apiKey = process.env.GOOGLE_VISION_API_KEY
-  if (!apiKey) throw new Error('GOOGLE_VISION_API_KEY is not set')
+function isPdf(buffer: Buffer): boolean {
+  return buffer.slice(0, 4).toString('ascii') === '%PDF'
+}
 
+/**
+ * Extract text from a PDF buffer using Vision's files:annotate endpoint,
+ * which handles PDFs natively (no image conversion needed).
+ */
+async function extractTextFromPdfBuffer(buffer: Buffer): Promise<string> {
+  const apiKey = getApiKey()
   const base64 = buffer.toString('base64')
 
-  const response = await fetch(`${VISION_API_URL}?key=${apiKey}`, {
+  const response = await fetch(`${VISION_BASE}/files:annotate?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       requests: [
         {
-          image: { content: base64 },
-          features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
-          imageContext: {
-            languageHints: ['en', 'hi'],  // English + Hindi for Indian forms
+          inputConfig: {
+            content: base64,
+            mimeType: 'application/pdf',
           },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+          pages: [1, 2, 3, 4, 5], // process up to 5 pages
         },
       ],
     }),
@@ -49,34 +57,79 @@ export async function extractTextFromBuffer(buffer: Buffer): Promise<string> {
 
   const data = await response.json()
 
-  // Check for API-level errors
-  if (data.error) {
-    throw new Error(`Vision API error: ${data.error.message}`)
-  }
+  if (data.error) throw new Error(`Vision API error: ${data.error.message}`)
 
   const result = data.responses?.[0]
-  if (result?.error) {
-    throw new Error(`Vision API request error: ${result.error.message}`)
-  }
+  if (result?.error) throw new Error(`Vision API request error: ${result.error.message}`)
 
-  // TEXT_DETECTION returns the full document text in textAnnotations[0].description
-  return result?.textAnnotations?.[0]?.description || ''
+  // For files:annotate the text is in responses[0].responses[0].fullTextAnnotation.text
+  const pages = result?.responses || []
+  return pages
+    .map((p: { fullTextAnnotation?: { text?: string } }) => p.fullTextAnnotation?.text || '')
+    .join('\n')
 }
 
-export async function extractTextFromBase64(base64: string, _mimeType: string): Promise<string> {
+/**
+ * Extract text from an image buffer using Vision's images:annotate endpoint.
+ */
+async function extractTextFromImageBuffer(buffer: Buffer, mimeType?: string): Promise<string> {
+  const apiKey = getApiKey()
+  const base64 = buffer.toString('base64')
+
+  const response = await fetch(`${VISION_BASE}/images:annotate?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: [
+        {
+          image: { content: base64 },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
+          imageContext: { languageHints: ['en', 'hi'] },
+        },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Vision API HTTP error ${response.status}: ${text}`)
+  }
+
+  const data = await response.json()
+
+  if (data.error) throw new Error(`Vision API error: ${data.error.message}`)
+
+  const result = data.responses?.[0]
+  if (result?.error) throw new Error(`Vision API request error: ${result.error.message}`)
+
+  // DOCUMENT_TEXT_DETECTION returns the full text in fullTextAnnotation.text
+  return result?.fullTextAnnotation?.text || result?.textAnnotations?.[0]?.description || ''
+}
+
+/**
+ * Main entry point — automatically detects PDF vs image and routes accordingly.
+ */
+export async function extractTextFromBuffer(buffer: Buffer, mimeType?: string): Promise<string> {
+  if (isPdf(buffer) || mimeType === 'application/pdf') {
+    return extractTextFromPdfBuffer(buffer)
+  }
+  return extractTextFromImageBuffer(buffer, mimeType)
+}
+
+export async function extractTextFromBase64(base64: string, mimeType: string): Promise<string> {
   const buffer = Buffer.from(base64, 'base64')
-  return extractTextFromBuffer(buffer)
+  return extractTextFromBuffer(buffer, mimeType)
 }
 
 export async function extractTextFromImage(imageUrl: string): Promise<string> {
   const res = await fetch(imageUrl)
+  const contentType = res.headers.get('content-type') || undefined
   const arrayBuffer = await res.arrayBuffer()
-  return extractTextFromBuffer(Buffer.from(arrayBuffer))
+  return extractTextFromBuffer(Buffer.from(arrayBuffer), contentType || undefined)
 }
 
 /**
- * Parse the raw OCR text and extract structured student form fields.
- * Uses regex patterns tuned for Indian school admission forms.
+ * Parse the raw OCR text into structured student form fields.
  */
 export function parseOcrText(text: string): Partial<StudentFormData> {
   const extracted: Partial<StudentFormData> = {}
@@ -84,11 +137,9 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
   const fullText = lines.join(' ')
 
   const patterns: Record<string, RegExp[]> = {
-    // ── Core fields ──────────────────────────────────────────────────────────
     studentName: [
       /student['s\s]*\s*name\s*[:\-]?\s*([A-Za-z\s]{3,40})/i,
       /name\s*of\s*(?:the\s*)?student\s*[:\-]?\s*([A-Za-z\s]{3,40})/i,
-      /(?:^|\s)name\s*[:\-]\s*([A-Za-z\s]{3,40})/i,
     ],
     admissionNumber: [
       /admission\s*(?:no|number|#)\.?\s*[:\-]?\s*([A-Z0-9\-\/]+)/i,
@@ -116,30 +167,22 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
     className: [
       /class\s*[:\-]?\s*([A-Za-z0-9]+)/i,
       /std\.?\s*[:\-]?\s*([A-Za-z0-9]+)/i,
-      /standard\s*[:\-]?\s*([A-Za-z0-9]+)/i,
     ],
     section: [
       /section\s*[:\-]?\s*([A-Za-z])\b/i,
-      /div(?:ision)?\s*[:\-]?\s*([A-Za-z])\b/i,
     ],
     aadharNumber: [
       /aadhar\s*(?:no|number|card)?\.?\s*[:\-]?\s*(\d{4}\s?\d{4}\s?\d{4})/i,
       /aadhaar\s*(?:no|number)?\.?\s*[:\-]?\s*(\d{4}\s?\d{4}\s?\d{4})/i,
-      /uid\s*[:\-]?\s*(\d{12})/i,
     ],
     address: [
       /present\s*(?:postal\s*)?address\s*[:\-]?\s*(.{10,120})/i,
       /(?:^|\s)address\s*[:\-]?\s*(.{10,120})/i,
     ],
-    religion: [
-      /religion\s*[:\-]?\s*([A-Za-z]+)/i,
-    ],
-    gender: [
-      /(?:sex|gender)\s*[:\-]?\s*(male|female|m|f)\b/i,
-    ],
+    religion: [/religion\s*[:\-]?\s*([A-Za-z]+)/i],
+    gender: [/(?:sex|gender)\s*[:\-]?\s*(male|female|m|f)\b/i],
     bloodGroup: [
       /blood\s*(?:group|type)\s*[:\-]?\s*([ABO]{1,2}[+-])/i,
-      /b\.?\s*g(?:roup)?\s*[:\-]?\s*([ABO]{1,2}[+-])/i,
     ],
     academicYear: [
       /academic\s*year\s*[:\-]?\s*(\d{4}[\-\/]\d{2,4})/i,
@@ -151,10 +194,7 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
     ],
     previousSchool: [
       /previous\s*school\s*[:\-]?\s*(.{5,80})/i,
-      /last\s*(?:attended\s*)?school\s*[:\-]?\s*(.{5,80})/i,
     ],
-
-    // ── New fields ────────────────────────────────────────────────────────────
     placeOfBirth: [
       /place\s*of\s*birth\s*[:\-]?\s*([A-Za-z\s,\.]{3,60})/i,
       /birth\s*place\s*[:\-]?\s*([A-Za-z\s,\.]{3,60})/i,
@@ -169,7 +209,7 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
     ],
     penNumber: [
       /p\.?\s*e\.?\s*n\.?\s*(?:no|number)?\.?\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
-      /permanent\s*education\s*(?:no|number)\.?\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
+      /pen\s*[:\-]\s*([A-Z0-9]{6,20})/i,
     ],
     satsNumber: [
       /s\.?\s*a\.?\s*t\.?\s*s\.?\s*(?:no|number)?\.?\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
@@ -180,16 +220,18 @@ export function parseOcrText(text: string): Partial<StudentFormData> {
       /abc\s*id\s*[:\-]?\s*([A-Z0-9]{6,20})/i,
     ],
     annualIncome: [
-      /annual\s*income\s*[:\-]?\s*([\d,\s\.]+)/i,
-      /family\s*(?:annual\s*)?income\s*[:\-]?\s*([\d,\s\.]+)/i,
-      /income\s*(?:per\s*annum|p\.?\s*a\.?)?\s*[:\-]?\s*([\d,\s\.]+)/i,
+      /annual\s*income\s*[:\-]?\s*((?:Rs\.?\s*)?[\d,\s\.]+)/i,
+      /income\s*(?:per\s*annum|p\.?\s*a\.?)?\s*[:\-]?\s*((?:Rs\.?\s*)?[\d,\s\.]+)/i,
     ],
     permanentAddress: [
       /permanent\s*(?:postal\s*)?address\s*[:\-]?\s*(.{10,120})/i,
-      /perm(?:anent)?\s*addr(?:ess)?\s*[:\-]?\s*(.{10,120})/i,
     ],
     occupation: [
       /(?:father['s\s]*)?occupation\s*[:\-]?\s*([A-Za-z\s]{3,30})/i,
+    ],
+    tcNumber: [
+      /t\.?\s*c\.?\s*(?:no|number)?\s*[:\-]?\s*([A-Z0-9\-]{4,20})/i,
+      /transfer\s*cert(?:ificate)?\s*(?:no|number)?\s*[:\-]?\s*([A-Z0-9\-]{4,20})/i,
     ],
   }
 

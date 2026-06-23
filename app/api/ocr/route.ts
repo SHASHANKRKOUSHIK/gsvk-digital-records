@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
+    const mimeType = file.type // pass MIME type so OCR knows PDF vs image
 
     const storagePath = `ocr/${Date.now()}-${file.name.replace(/\s/g, '_')}`
     let publicUrl = ''
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     })
 
     try {
-      const rawText = await extractTextFromBuffer(buffer)
+      const rawText = await extractTextFromBuffer(buffer, mimeType)
       const extractedData = parseOcrText(rawText)
 
       await prisma.ocrJob.update({
