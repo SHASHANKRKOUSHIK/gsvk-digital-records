@@ -109,7 +109,7 @@ export default function StudentForm({ studentId, defaultValues, admissionPdfFile
         }
       }
 
-      router.push(`/student/${json.id}`)
+      router.push(`/dashboard/students/${json.id}`)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { formatDate, bloodGroupLabel, classLabel } from '@/lib/utils'
-import { GraduationCap, User, Phone, MapPin, FileText, QrCode, Download } from 'lucide-react'
+import { GraduationCap, User, Phone, MapPin, FileText, QrCode, Download, LayoutDashboard, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
@@ -47,6 +47,16 @@ export default async function StudentProfilePage({ params }: Props) {
             <p className="text-blue-200 text-xs">Student Profile</p>
           </div>
           <div className="ml-auto flex gap-2">
+            <Link href="/dashboard"
+              className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </Link>
+            <Link href={`/dashboard/students/${id}`}
+              className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Student Record</span>
+            </Link>
             <a href={`/api/students/${id}/pdf`}
               className="hidden sm:inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
               <Download className="w-3.5 h-3.5" /> Download PDF
@@ -234,3 +244,4 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
     </div>
   )
 }
+  
