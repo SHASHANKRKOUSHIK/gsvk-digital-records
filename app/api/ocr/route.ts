@@ -15,14 +15,14 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    const mimeType = file.type // pass MIME type so OCR knows PDF vs image
+    const mimeType = file.type
 
     const storagePath = `ocr/${Date.now()}-${file.name.replace(/\s/g, '_')}`
     let publicUrl = ''
     try {
       publicUrl = await uploadFile(buffer, storagePath, file.type)
     } catch (e) {
-      console.warn('Storage upload failed, continuing with OCR:', e)
+      console.warn('Storage upload failed:', e)
     }
 
     const job = await prisma.ocrJob.create({
@@ -39,12 +39,34 @@ export async function POST(req: NextRequest) {
       const rawText = await extractTextFromBuffer(buffer, mimeType)
       const extractedData = parseOcrText(rawText)
 
+      // ── DEBUG: log first 3000 chars of raw text so we can see exactly
+      //          what Vision returned and tune regex patterns to match it
+      console.log('=== OCR RAW TEXT (first 3000 chars) ===')
+      console.log(rawText.slice(0, 3000))
+      console.log('=== OCR EXTRACTED ===')
+      console.log(JSON.stringify(extractedData, null, 2))
+
       await prisma.ocrJob.update({
         where: { id: job.id },
-        data: { status: 'REVIEW', rawText, extractedData, completedAt: new Date() },
+        data: {
+          status: 'REVIEW',
+          rawText,
+          // Return rawText in extractedData temporarily so we can see it in the UI
+          extractedData: {
+            ...extractedData,
+            _debug_rawText: rawText.slice(0, 2000),
+          },
+          completedAt: new Date(),
+        },
       })
 
-      return NextResponse.json({ jobId: job.id, extractedData, rawText })
+      return NextResponse.json({
+        jobId: job.id,
+        extractedData,
+        rawText,
+        // Return raw text so we can inspect it
+        _debug: rawText.slice(0, 2000),
+      })
     } catch (ocrErr) {
       await prisma.ocrJob.update({
         where: { id: job.id },
